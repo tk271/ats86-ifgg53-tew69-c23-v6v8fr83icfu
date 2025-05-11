@@ -1,197 +1,267 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>問題集</title>
-    <!-- PapaParse for robust CSV parsing -->
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 16px;
-            color: #333;
-            background-color: #f5f5f7;
-        }
-        h1 { text-align: center; color: #0070c9; margin-bottom: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .tab-container { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
-        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; }
-        .tab.active { border-bottom: 2px solid #0070c9; color: #0070c9; font-weight: bold; }
-        .content { display: none; }
-        .content.active { display: block; }
-        .question { margin-bottom: 20px; font-size: 18px; }
-        .option { margin: 8px 0; padding: 10px; background-color: #f0f0f0; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
-        .option:hover { background-color: #e0e0e0; }
-        .option.selected { background-color: #0070c9; color: white; }
-        .option.correct { background-color: #4CAF50; color: white; }
-        .option.incorrect { background-color: #f44336; color: white; }
-        .explanation { margin-top: 20px; padding: 15px; background-color: #e8f4fc; border-radius: 8px; display: none; }
-        button { background-color: #0070c9; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 10px 5px 10px 0; }
-        button:hover { background-color: #00569c; }
-        textarea { width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 10px; font-family: monospace; }
-        input[type="file"] { margin: 10px 0; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f0f0f0; }
-        .actions { display: flex; justify-content: space-between; margin-top: 20px; }
-        .progress { margin-bottom: 20px; text-align: right; color: #666; }
-        .edit-buttons { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 600px; }
-        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .close:hover { color: black; }
-        label { display: block; margin-top: 10px; font-weight: bold; }
-        input[type="text"], select { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; }
-        .option-container { margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; padding: 10px; }
-        .option-row { display: flex; margin-bottom: 5px; }
-        .option-row input[type="text"] { flex-grow: 1; margin-right: 10px; }
-        .remove-option { background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 5px 10px; }
-        .add-option { background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 5px 10px; margin-top: 5px; }
-        .checkbox-container { margin-top: 5px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>ランダムクイズ</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+    h2 { margin-top: 1.5em; }
+    .hidden { display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    textarea { width: 100%; height: 4em; }
+    .option-row { display: flex; align-items: center; margin-bottom: 4px; }
+    .option-row input[type="text"] { flex: 1; margin-right: 8px; }
+    button { margin: 4px; }
+    .explanation { background: #f9f9f9; padding: 10px; margin-top: 10px; border-left: 4px solid #6c6; }
+  </style>
+  <!-- CSVパース用ライブラリ -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>問題集</h1>
-        <div class="tab-container">
-            <div class="tab active" onclick="showTab('practice')">学習モード</div>
-            <div class="tab" onclick="showTab('edit')">問題管理</div>
-            <div class="tab" onclick="showTab('import-export')">インポート/エクスポート</div>
-        </div>
-        <!-- 学習モード -->
-        <div id="practice" class="content active">
-            <div class="progress"><span id="question-number">問題 0/0</span></div>
-            <div id="question-text" class="question"></div>
-            <div id="options-container"></div>
-            <div id="explanation" class="explanation"></div>
-            <div class="actions">
-                <button id="check-answer" onclick="checkAnswer()">答え合わせ</button>
-                <button id="dont-know" onclick="dontKnow()">わからない</button>
-                <button id="next-question" onclick="nextQuestion()" style="display: none;">次の問題</button>
-            </div>
-        </div>
-        <!-- 問題管理 -->
-        <div id="edit" class="content">
-            <div class="edit-buttons"><button onclick="showAddQuestionModal()">問題を追加</button></div>
-            <table id="questions-table">
-                <thead><tr><th>問題</th><th>操作</th></tr></thead>
-                <tbody id="questions-table-body"></tbody>
-            </table>
-        </div>
-        <!-- インポート/エクスポート -->
-        <div id="import-export" class="content">
-            <h2>CSVインポート/エクスポート</h2>
-            <p>CSVフォーマット: 問題,選択肢1|選択肢2|...,正解(0-indexed),解説,複数選択(true/false)</p>
-            <button onclick="exportToCSV()">CSVエクスポート</button>
-            <div style="margin-top: 20px;">
-                <h3>CSVインポート</h3>
-                <input type="file" id="csv-file-input" accept=".csv" />
-                <button onclick="handleFileImport()">ファイルからインポート</button>
-                <textarea id="csv-import" placeholder="CSVデータを貼り付けてください"></textarea>
-                <button onclick="importFromCSV()">インポート</button>
-            </div>
-        </div>
+
+  <h1>ランダムクイズ管理＆テスト</h1>
+
+  <!-- タブ切り替え -->
+  <button id="btn-manage">管理モード</button>
+  <button id="btn-quiz">テストモード</button>
+
+  <!-- 管理モード（デフォルトで表示） -->
+  <div id="manage">
+    <h2>問題一覧 (論理削除済みはグレー表示)</h2>
+    <button id="btn-export-csv">CSVエクスポート</button>
+    <input type="file" id="input-import-csv" accept=".csv">
+    <table id="tbl-questions">
+      <thead>
+        <tr><th>ID</th><th>問題文</th><th>形式</th><th>選択肢数</th><th>状態</th><th>操作</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2 id="form-title">新規問題追加</h2>
+    <form id="frm-question">
+      <input type="hidden" id="q-id">
+      <label>問題文：<br><textarea id="q-text" required></textarea></label><br>
+      <label>解説：<br><textarea id="q-explanation"></textarea></label><br>
+      <label>形式：
+        <select id="q-type">
+          <option value="single">単一選択</option>
+          <option value="multiple">複数選択</option>
+        </select>
+      </label><br>
+      <div id="options">
+        <h3>選択肢</h3>
+      </div>
+      <button type="button" id="btn-add-option">選択肢を追加</button><br>
+      <button type="submit">保存</button>
+      <button type="button" id="btn-cancel-edit" class="hidden">キャンセル</button>
+    </form>
+  </div>
+
+  <!-- テストモード -->
+  <div id="quiz" class="hidden">
+    <h2>ランダムテスト</h2>
+    <button id="btn-start">開始</button>
+    <div id="quiz-area" class="hidden">
+      <div id="question-area"></div>
+      <button id="btn-submit">答える</button>
+      <button id="btn-dontknow">わからない</button>
+      <div id="explanation-area"></div>
+      <button id="btn-next" class="hidden">次へ</button>
     </div>
+  </div>
 
-    <!-- 問題追加/編集モーダル -->
-    <div id="question-modal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h2 id="modal-title">問題を追加</h2>
-            <input type="hidden" id="question-id">
-            <label for="question-text-input">問題</label>
-            <textarea id="question-text-input" style="height: 100px;"></textarea>
-            <label>選択肢</label>
-            <div id="options-input-container" class="option-container"></div>
-            <button class="add-option" onclick="addOptionInput()">選択肢を追加</button>
-            <div class="checkbox-container">
-                <input type="checkbox" id="multiple-choice"><label for="multiple-choice" style="display: inline;">複数選択問題</label>
-            </div>
-            <label for="explanation-input">解説</label>
-            <textarea id="explanation-input" style="height: 100px;"></textarea>
-            <div class="actions">
-                <button onclick="saveQuestion()">保存</button>
-                <button onclick="closeModal()" style="background-color: #999;">キャンセル</button>
-            </div>
-        </div>
-    </div>
+  <script>
+    let questions = [];
+    let quizOrder = [], currentQ = 0, currentShuffledChoices = [];
 
-    <script>
-        // データ構造
-        let questions = [];
-        let currentQuestionIndex = 0;
-        let selectedOptions = [];
-        let answerChecked = false;
+    const loadQuestions = () => {
+      const data = localStorage.getItem('quiz-questions');
+      questions = data ? JSON.parse(data) : [];
+    };
+    const saveQuestions = () => {
+      localStorage.setItem('quiz-questions', JSON.stringify(questions));
+    };
+    const shuffle = arr => {
+      for(let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    };
 
-        // 初期化
-        window.onload = function() {
-            loadQuestions();
-            renderQuestionsList();
-            if (questions.length > 0) showQuestion(0);
-        };
+    const renderTable = () => {
+      const tbody = document.querySelector('#tbl-questions tbody');
+      tbody.innerHTML = '';
+      questions.forEach(q => {
+        const tr = document.createElement('tr');
+        if(q.isDeleted) tr.style.color = '#aaa';
+        tr.innerHTML = `
+          <td>${q.id}</td>
+          <td>${q.text.replace(/\n/g,'<br>')}</td>
+          <td>${q.type === 'single' ? '単一' : '複数'}</td>
+          <td>${q.choices.length}</td>
+          <td>${q.isDeleted ? '論理削除' : 'OK'}</td>
+          <td>
+            <button class="edit" data-id="${q.id}">編集</button>
+            <button class="toggle-delete" data-id="${q.id}">${q.isDeleted ? '復活' : '論理削除'}</button>
+            <button class="del" data-id="${q.id}">物理削除</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    };
 
-        // CSVエクスポート (PapaParse)
-        function exportToCSV() {
-            const data = questions.map(q => ({
-                question: q.question.replace(/\n/g, '\\n'),
-                options: q.options.map(opt => opt.replace(/\|/g, '\\|')).join('|'),
-                correctAnswers: q.correctAnswers.join('|'),
-                explanation: q.explanation.replace(/\n/g, '\\n'),
-                multipleChoice: q.multipleChoice
-            }));
-            const csv = Papa.unparse(data);
-            downloadCSV(csv, 'comptia-questions.csv');
+    function makeOptionRow(text = '', correct = false) {
+      const div = document.createElement('div');
+      div.className = 'option-row';
+      div.innerHTML = `
+        <input type="text" class="opt-text" value="${text}" placeholder="選択肢">
+        <label><input type="checkbox" class="opt-correct" ${correct?'checked':''}>正解</label>
+        <button type="button" class="btn-remove-opt">✕</button>`;
+      div.querySelector('.btn-remove-opt').onclick = () => div.remove();
+      return div;
+    }
+
+    function resetForm() {
+      document.getElementById('q-id').value = '';
+      document.getElementById('q-text').value = '';
+      document.getElementById('q-explanation').value = '';
+      document.getElementById('q-type').value = 'single';
+      const opts = document.getElementById('options');
+      opts.innerHTML = '<h3>選択肢</h3>';
+      opts.appendChild(makeOptionRow());
+      document.getElementById('form-title').textContent = '新規問題追加';
+      document.getElementById('btn-cancel-edit').classList.add('hidden');
+    }
+
+    function loadToForm(id) {
+      const q = questions.find(x => x.id === id);
+      if(!q) return;
+      document.getElementById('q-id').value = q.id;
+      document.getElementById('q-text').value = q.text;
+      document.getElementById('q-explanation').value = q.explanation;
+      document.getElementById('q-type').value = q.type;
+      const opts = document.getElementById('options');
+      opts.innerHTML = '<h3>選択肢</h3>';
+      q.choices.forEach((c, i) => opts.appendChild(makeOptionRow(c, q.correctIndices.includes(i))));
+      document.getElementById('form-title').textContent = `ID ${q.id} を編集`;
+      document.getElementById('btn-cancel-edit').classList.remove('hidden');
+    }
+
+    window.onload = () => {
+      loadQuestions();
+      renderTable();
+      resetForm();
+
+      document.getElementById('btn-manage').onclick = () => {
+        document.getElementById('manage').classList.remove('hidden');
+        document.getElementById('quiz').classList.add('hidden');
+      };
+      document.getElementById('btn-quiz').onclick = () => {
+        document.getElementById('quiz').classList.remove('hidden');
+        document.getElementById('manage').classList.add('hidden');
+      };
+
+      document.getElementById('btn-add-option').onclick = () =>
+        document.getElementById('options').appendChild(makeOptionRow());
+
+      document.getElementById('frm-question').onsubmit = e => {
+        e.preventDefault();
+        const idField = document.getElementById('q-id');
+        const id = idField.value ? parseInt(idField.value) : Date.now();
+        const text = document.getElementById('q-text').value.trim();
+        const explanation = document.getElementById('q-explanation').value.trim();
+        const type = document.getElementById('q-type').value;
+        const optRows = document.querySelectorAll('.option-row');
+        const choices = [], correct = [];
+        optRows.forEach((row, i) => {
+          const t = row.querySelector('.opt-text').value.trim();
+          if(!t) return;
+          choices.push(t);
+          if(row.querySelector('.opt-correct').checked) correct.push(choices.length-1);
+        });
+        if(choices.length < 2) return alert('選択肢は2つ以上必要だよ！');
+        if(correct.length < 1) return alert('正解は最低1つ選んでね！');
+        const obj = { id, text, explanation, type, choices, correctIndices: correct, isDeleted: false };
+        const idx = questions.findIndex(q => q.id === id);
+        if(idx >= 0) questions[idx] = obj; else questions.push(obj);
+        saveQuestions(); renderTable(); resetForm();
+      };
+
+      document.getElementById('btn-cancel-edit').onclick = resetForm;
+
+      document.querySelector('#tbl-questions tbody').onclick = e => {
+        const id = parseInt(e.target.dataset.id);
+        if(e.target.classList.contains('edit')) loadToForm(id);
+        if(e.target.classList.contains('del')) {
+          if(confirm('本当に物理削除する？戻せないよ💦')) {
+            questions = questions.filter(q => q.id !== id);
+            saveQuestions(); renderTable();
+          }
         }
-        function downloadCSV(csv, filename) {
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+        if(e.target.classList.contains('toggle-delete')) {
+          const q = questions.find(q => q.id === id);
+          q.isDeleted = !q.isDeleted; saveQuestions(); renderTable();
         }
+      };
 
-        // ファイルインポート
-        function handleFileImport() {
-            const input = document.getElementById('csv-file-input');
-            if (!input.files || !input.files.length) { alert('CSVファイルを選択してください'); return; }
-            const reader = new FileReader();
-            reader.onload = e => document.getElementById('csv-import').value = e.target.result;
-            reader.readAsText(input.files[0], 'UTF-8');
+      document.getElementById('btn-start').onclick = () => {
+        const active = questions.filter(q => !q.isDeleted);
+        if(active.length === 0) return alert('有効な問題がないよ💦');
+        quizOrder = active.map((_, i) => i); shuffle(quizOrder);
+        currentQ = 0;
+        document.getElementById('quiz-area').classList.remove('hidden');
+        document.getElementById('btn-start').classList.add('hidden');
+        showQuestion();
+      };
+      document.getElementById('btn-submit').onclick = () => showExplanation(false);
+      document.getElementById('btn-dontknow').onclick = () => showExplanation(true);
+      document.getElementById('btn-next').onclick = () => {
+        currentQ++;
+        document.getElementById('btn-next').classList.add('hidden');
+        document.getElementById('explanation-area').innerHTML = '';
+        if(currentQ < quizOrder.length) showQuestion();
+        else {
+          document.getElementById('question-area').innerHTML = '<p>おつかれさま！全問終了だよ😊</p>';
+          document.getElementById('btn-submit').classList.add('hidden');
+          document.getElementById('btn-dontknow').classList.add('hidden');
         }
+      };
+    };
 
-        // CSVインポート (PapaParse)
-        function importFromCSV() {
-            const csvText = document.getElementById('csv-import').value.trim();
-            if (!csvText) { alert('CSVデータを入力してください'); return; }
-            const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-            if (result.errors.length) { console.error(result.errors); alert('CSV解析エラー: ' + result.errors[0].message); return; }
-            const newQuestions = [];
-            result.data.forEach(row => {
-                try {
-                    const question = row.question.replace(/\\n/g, '\n');
-                    const options = row.options.split('|').map(opt => opt.replace(/\\\|/g, '|'));
-                    const correctAnswers = row.correctAnswers.split('|').map(n => parseInt(n, 10));
-                    const explanation = (row.explanation || '').replace(/\\n/g, '\n');
-                    const multipleChoice = String(row.multipleChoice).toLowerCase() === 'true';
-                    newQuestions.push({ question, options, correctAnswers, explanation, multipleChoice });
-                } catch (err) { console.warn('パース失敗行:', row, err); }
-            });
-            if (!newQuestions.length) { alert('インポートできる問題がありませんでした'); return; }
-            if (confirm(`${newQuestions.length}問をインポートします。既存の問題を置き換えますか？`)) {
-                questions = newQuestions;
-            } else if (confirm('既存の問題に追加しますか？')) {
-                questions = questions.concat(newQuestions);
-            } else {
-                return;
-            }
-            saveQuestions(); renderQuestionsList(); showTab('practice'); showQuestion(0);
-            document.getElementById('csv-import').value = '';
-            alert(`${newQuestions.length}問をインポートしました`);
-        }
+    function showQuestion() {
+      const qList = questions.filter(q => !q.isDeleted);
+      const q = qList[quizOrder[currentQ]];
+      const container = document.getElementById('question-area');
+      container.innerHTML = `<p>Q${currentQ+1}. ${q.text.replace(/\n/g,'<br>')}</p>`;
+      const idxs = q.choices.map((_, i) => i);
+      shuffle(idxs); currentShuffledChoices = idxs;
+      const list = document.createElement('div');
+      idxs.forEach(i => {
+        list.innerHTML += `<label><input type="${q.type === 'single' ? 'radio' : 'checkbox' }" name="opt" value="${i}"> ${q.choices[i].replace(/\n/g,'<br>')}</label><br>`;
+      });
+      container.appendChild(list);
+      document.getElementById('btn-submit').classList.remove('hidden');
+      document.getElementById('btn-dontknow').classList.remove('hidden');
+    }
 
-        // 以下、既存のロード/保存/タブ切替・問題表示・編集・削除ロジックは変更なし
-        // ...（省略）
-    </script>
+    function showExplanation(skipped) {
+      const q = questions.filter(q => !q.isDeleted)[quizOrder[currentQ]];
+      let ok = false;
+      if(!skipped) {
+        const selected = Array.from(document.querySelectorAll('input[name="opt"]:checked'))
+          .map(el => parseInt(el.value)).sort();
+        ok = JSON.stringify(selected) === JSON.stringify(q.correctIndices.slice().sort());
+      }
+      const area = document.getElementById('explanation-area');
+      area.innerHTML = `
+        <div class="explanation">
+          ${skipped ? '<p>「わからない」が選択されました。</p>' : (ok ? '<p>✅ 正解！</p>' : '<p>❌ 不正解…</p>')}
+          <p>${q.explanation.replace(/\n/g,'<br>')}</p>
+        </div>`;
+      document.getElementById('btn-next').classList.remove('hidden');
+      document.getElementById('btn-submit').classList.add('hidden');
+      document.getElementById('btn-dontknow').classList.add('hidden');
+    }
+  </script>
 </body>
 </html>
